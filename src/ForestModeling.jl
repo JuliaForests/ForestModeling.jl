@@ -1,73 +1,87 @@
+"""
+Description:
+
+ForestModeling.jl is the generic allometric-regression engine behind
+`ForestMensuration.jl`: a bounded-transform-catalog search over classic
+regression-equation shapes, model selection by composite ranking, and
+grouped/stratified-regression variants for hierarchical data, plus stem
+taper model fitting (see below). It has no forestry domain knowledge beyond
+that — site/age classification and every other forestry-specific
+application live in `ForestMensuration.jl`, which consumes the
+`AllometricModel`s this package fits.
+
+# Stem taper models
+
+[`TaperModel`](@ref) and its 10 concrete subtypes (`Kozak1969`,
+`Schoepfer1966`, `Matte1949`, `Demaerschalk1972`, `Clutter1980`,
+`MaxBurkhart1976`, `Johnson1911`, `Kozak1988`, `Kozak2004`, `Bi2000`) are the
+one part of this package that *is* forestry-specific: classic published
+stem-profile equations, fit with [`fit`](@ref)`(model, dbh, height, hi, di)`
+against pooled stem-scaling data into a [`TaperFit`](@ref). Linear forms are
+solved in closed form; nonlinear forms use `LsqFit.jl`. The forestry-facing,
+`Unitful`-aware application of a `TaperFit` (diameter/height at a point,
+integrated volume, log assortment) lives in `ForestMensuration.jl`.
+
+# Units of measurement
+
+Every fitting entry point (`fit`, `regression`, `fitRobust`,
+[`regressionGrouped`](@ref)) accepts `Unitful` quantity columns and plain
+numbers interchangeably. Units are stripped before fitting (`Unitful`
+disallows `log`/`exp` of a dimensioned quantity, which the transform catalog
+relies on) and reattached wherever a result sits directly on the response's
+scale — `predict`, `fitted`, `response`, `residuals`. Fitting on plain
+numbers behaves exactly as if `Unitful` did not exist: every such result
+stays a plain `Float64`. Summary statistics and tables (`rmse`, `mae`,
+[`criteriaTable`](@ref), [`metrics`](@ref)) are always plain numbers, on the
+same numeric scale the model was fit on.
+"""
 module ForestModeling
 
-using Combinatorics, DataFrames, Unitful, StatsModels, StatsBase, Tables, LinearAlgebra, Distributions, HypothesisTests
-import Tables: istable, getcolumn
+using LinearAlgebra, Statistics, StatsBase, StatsModels, GLM, Distributions,
+      HypothesisTests, Tables, DataFrames, Combinatorics, Printf, Optim, ForestFoundations, ADTypes, LsqFit
+using ForwardDiff   # activates Optim/DifferentiationInterface's ForwardDiff extension for `fitRobust`
 
-using StatsAPI
-import StatsBase: coef, coeftable, coefnames, confint, deviance, nulldeviance, dof, dof_residual,
-  loglikelihood, nullloglikelihood, nobs, stderror, vcov,
-  residuals, predict, predict!,
-  fitted, fit, model_response, response, modelmatrix, r2, r², adjr2, adjr², PValue
+import StatsAPI: RegressionModel, coef, coefnames, confint, deviance, dof, dof_residual, fit, fitted,
+                  loglikelihood, modelmatrix, nobs, nulldeviance, nullloglikelihood,
+                  predict, r2, adjr2, residuals, response, stderror, vcov
+import StatsBase: cooksdistance, competerank, CoefTable
+import StatsModels: missing_omit
+import Tables: columntable
+import StatsModels: @formula
 
-import StatsModels: hasintercept, missing_omit, formula, modelmatrix, @formula
+# `fit` is imported (not just `using`) specifically so that
+# `function fit(::Type{AllometricModel}, ...)` below *extends* the shared
+# StatsAPI.fit generic — the same one GLM.jl's own `fit(LinearModel, ...)`
+# implements — instead of accidentally shadowing it with a new local method.
 
-export coef, coeftable, confint, deviance, nulldeviance, dof, dof_residual,
-  loglikelihood, nullloglikelihood, nobs, stderror, vcov, residuals, predict,
-  fitted, fit, fit!, model_response, response, modelmatrix, r2, r², adjr2, adjr²,
-  cooksdistance, hasintercept, dispersion, vif, gvif, termnames, @formula
+include("types.jl")
+include("units.jl")
+include("formula/transforms.jl")
+include("formula/classicequations.jl")
+include("fitting/ols.jl")
+include("fitting/robust.jl")
+include("inference/parameters.jl")
+include("inference/diagnostics.jl")
+include("inference/criteria.jl")
+include("display.jl")
+include("fitting/grouped.jl")
+include("taper/models.jl")
+include("taper/fitting.jl")
 
-abstract type ForestModel <: RegressionModel end
-const S = Union{Symbol,String}
-const β0 = InterceptTerm{true}()
-
-struct AllometricModel{F<:FormulaTerm,N<:NamedTuple,T<:Float64,I<:Int64} <: RegressionModel
-  formula::F
-  data::N
-  β::Vector{T}
-  Σ::Matrix{T}
-  σ²::T
-  n::I
-  ν::I
-  p::I
-  sse::T
-  sst::T
-  r2::T
-  adjr2::T
-  ev::T
-  mae::T
-  mape::T
-  mse::T
-  rmse::T
-  cv::T
-  syx::T
-  uncertainty::T
-end
-
-import Base: show
-
-_coefnames(model::AllometricModel) = vcat("β0", string.(StatsModels.coefnames(model.formula.rhs.terms[2:end])))
-
-function show(io::IO, model::AllometricModel)
-  β = model.β
-  n = length(β)
-  output = string(StatsModels.coefnames(model.formula.lhs)) * " = $(round(β[1], digits = 4))"
-  for i in 2:n
-    term = _coefnames(model)[i]
-    product = string(round(abs(β[i]), sigdigits=4)) * " * " * term
-    output *= signbit(β[i]) ? " - $(product)" : " + $(product)"
-  end
-  print(io, output)
-end
-
-include("fitlinearmodel.jl")
-include("selectioncriteria.jl")
-include("parameters.jl")
-
-export regression,
-  criteriatable,
-  bestmodel,
-  AllometricModel,
-  ContinuousTerm,
-  CategoricalTerm
+export
+  @formula,
+  AllometricModel, AllometricMethod, OLS, SSE, MAE, HUBER, MSLE, MAPE,
+  fit, regression, fitCombinations, fitRobust, fitClassic, classicEquations,
+  criteriaTable, criteriaSelection,
+  predict, predictBiasCorrected!, fitted, residuals,
+  coef, coefnames, coeftable, vcov, stderror, confint, pvalue,
+  r2, adjr2, dispersion, cooksdistance, isNormality,
+  nobs, dof, dof_residual, formula, modelmatrix, response,
+  deviance, nulldeviance, loglikelihood, nullloglikelihood,
+  petterson, naslund, prodan, metrics, summary,
+  GroupedModel, regressionGrouped, predictBounded,
+  TaperModel, TaperFit, ncoef, islinear,
+  Kozak1969, Schoepfer1966, Matte1949, Demaerschalk1972, Clutter1980,
+  MaxBurkhart1976, Johnson1911, Kozak1988, Kozak2004, Bi2000
 
 end
