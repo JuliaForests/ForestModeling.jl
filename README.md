@@ -21,30 +21,44 @@ factor.
 
 For every model: `predict` (with confidence and prediction intervals), `calibrate` (the random
 effects of a new plot from a few measured trees), `blockcv` and `metrics` (cross-validation by
-plot, RMSE, bias, MAPE) and `robustvcov` (sandwich covariance). The equations `chapmanrichards`,
-`weibull`, `prodan`, `curtis`, `schumacherhall`, `spurr` and `power` are plain functions for the
-nonlinear fits.
+plot, RMSE, bias, MAPE), `graybilltest` (the F test of Graybill, predicted against observed),
+`identitytest` (whether several clones, stands or species share one equation) and `robustvcov`
+(sandwich covariance). The equations `chapmanrichards`, `weibull`, `prodan`, `curtis`,
+`schumacherhall`, `spurr`, `honer`, `takata` and `power` are plain functions for the nonlinear fits.
+
+Taper and assortments: the stem taper equations `kozak1969`, `schoepfer1966`, `ormerod1973`,
+`demaerschalk1972`, `maxburkhart1976`, `kozak1988`, `kozak2004` and `bi2000`, fitted by `fitnls`,
+give the diameter at a height (`taperdiameter`), the height of a diameter (`taperheight`, Roots.jl),
+the volume of a section (`taperedvolume`, QuadGK.jl) and the logs of each product
+(`logassortment`).
 
 ## Example
 
 ```julia
-using ForestModeling, DataFrames
+julia> using ForestModeling, DataFrames
 
-# Schumacher–Hall, with the volume itself as the response
-volume = fitglm(@formula(v ~ log(d) + log(h)), data)
+julia> data = DataFrame(h=[10.2, 15.3, 14.8, 9.7, 16.5, 13.1, 11.6, 12.4, 14.2, 15.0]u"m",
+                        d=[20.5, 25.3, 24.1, 18.7, 26.2, 22.5, 19.8, 21.0, 23.4, 24.5]u"cm");
 
-# Chapman–Richards with the variance growing with the height
-cr(d, θ) = chapmanrichards(d, θ; href=1.3)
-height = fitnls(cr, data, :h, :d, [20.0, 0.05, 1.0])
-predict(height, data; interval=:prediction)
+# Curtis as a generalized linear model: the log link, the height itself as the response
+julia> fitglm(@formula(h ~ inv(d)), data)
+h = exp(4.075 - 33.54 * inv(d))
 
-# a random effect for each plot, calibrated in a new plot from two measured heights
-mixed = fitmixed(@formula(h ~ 1 + log(d) + (1 | plot)), data)
-calibrate(mixed, newplot[1:2, :], newplot)
+# the same equation as a nonlinear regression, with the variance growing with the height
+julia> model = fitnls(curtis, data, :h, :d, [3.5, -10.0])
+h = curtis(d; θ = [4.089, -33.89])
 
-# the error of a new plot
-blockcv(t -> fitglm(@formula(v ~ log(d) + log(h)), t), data, :v, :plot)
+julia> predict(model, data[1:2, :]; interval=:prediction)
+2×3 DataFrame
+ Row │ prediction  lower      upper
+     │ Quantity…   Quantity…  Quantity…
+─────┼──────────────────────────────────
+   1 │  11.4283 m  9.81524 m  13.0413 m
+   2 │   15.638 m  15.1408 m  16.1353 m
 ```
+
+The tutorial of the documentation fits volume, biomass and height, a mixed model by plot with its
+calibration, and validates the models by plot.
 
 ## License
 

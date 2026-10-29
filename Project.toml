@@ -14,8 +14,10 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LsqFit = "2fda8390-95c7-5789-9bda-21331edee243"
 MixedModels = "ff71e718-51f3-5ec2-a782-8ffcbfa3c316"
 Optim = "429524aa-4258-5aef-a3af-852621145aeb"
+QuadGK = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
+Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsAPI = "82ae8749-77ed-4fe6-ae5f-f523153014b0"
 StatsModels = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
@@ -31,16 +33,19 @@ LinearAlgebra = "1.10"
 LsqFit = "0.16"
 MixedModels = "5"
 Optim = "2"
+QuadGK = "2"
 Random = "1.10"
 Reexport = "1.2.2"
+Roots = "3"
 Statistics = "1.10"
 StatsAPI = "1.8"
 StatsModels = "0.7"
 julia = "1.12"
 
 [extras]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [targets]
-test = ["Test", "Unitful"]
+test = ["CSV", "Test", "Unitful"]

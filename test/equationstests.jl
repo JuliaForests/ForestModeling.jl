@@ -11,3 +11,8 @@
   @test chapmanrichards(0.0, [25.0, 0.08, 1.2]; href=1.37) == 1.37
   @test chapmanrichards(1e6, [25.0, 0.08, 1.2]; href=1.3) ≈ 26.3
 end
+
+@testset "volume equations" begin
+  @test honer(20.0, 18.0, [400.0, 20000.0]) ≈ 400 / (400 + 20000 / 18)
+  @test takata(20.0, 18.0, [20000.0, 400.0]) ≈ 400 * 18 / (20000 + 400 * 20)
+end

@@ -17,8 +17,9 @@ quantities (see [`fitglm`](@ref)).
 others; [`calibrate`](@ref) predicts the random effects of new plots from a few measured trees.
 
 # Example
+With `heights`, the table of the tutorial:
 ```julia
-model = fitmixed(@formula(h ~ 1 + log(d) + (1 | plot)), data)
+model = fitmixed(@formula(h ~ 1 + log(d) + (1 | plot)), heights)   # h = -47.59 + 20.45 * log(d) + (1 | plot)
 ```
 """
 function fitmixed(formula::FormulaTerm, data)

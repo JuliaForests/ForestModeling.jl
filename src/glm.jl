@@ -20,10 +20,11 @@ The columns may be `Unitful` quantities: the fit uses their values in the unit o
 [`predict`](@ref) and `residuals` give the response in its unit.
 
 # Example
+With `volume` and `heights`, the tables of the tutorial:
 ```julia
-data = DataFrame(d=[12.0, 18.5, 25.0]u"cm", h=[14.0, 19.0, 23.5]u"m", v=[0.08, 0.24, 0.52]u"m^3")
-model = fitglm(@formula(v ~ log(d) + log(h)), data)
-predict(model, data)
+model = fitglm(@formula(v ~ log(d) + log(h)), volume)   # v = exp(-12.02 + 1.988 * log(d) + 1.563 * log(h))
+predict(model, volume)
+fitglm(@formula(h ~ inv(d)), heights)                    # Curtis: h = exp(3.91 - 25.21 * inv(d))
 ```
 """
 function fitglm(formula::FormulaTerm, data; family=Gamma(), link=LogLink())

@@ -25,9 +25,10 @@ mode has the closed form
 ```
 
 # Example
+With the mixed model of [`fitmixed`](@ref) and a new plot of which two heights were measured:
 ```julia
-measured = filter(r -> !ismissing(r.h), newplots)   # the trees with height
-calibrate(model, measured, newplots)
+measured = newplot[1:2, :]
+calibrate(model, measured, newplot)
 ```
 """
 function calibrate(model::UnitfulModel{<:LinearMixedModel}, measured, newdata)

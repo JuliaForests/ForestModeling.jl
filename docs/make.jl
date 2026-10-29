@@ -17,6 +17,7 @@ makedocs(;
   pages=[
     "ForestModeling Package" => "forestmodeling.md",
     "Getting Started" => "tutorial.md",
+    "Taper and Assortments" => "assortment.md",
     "API Reference" => "reference.md",
     "Index" => "index.md",
   ],

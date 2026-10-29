@@ -45,8 +45,5 @@ vcov(m::UnitfulModel) = vcov(m.model)
 stderror(m::UnitfulModel) = stderror(m.model)
 nobs(m::UnitfulModel) = nobs(m.model)
 residuals(m::UnitfulModel) = (response(m.model) .- fitted(m.model)) .* m.units[m.response]
-
-function Base.show(io::IO, m::UnitfulModel)
-  show(io, MIME("text/plain"), m.model)
-  print(io, "\n\nResponse: ", m.response, " (", m.units[m.response], ")")
-end
+loglikelihood(m::UnitfulModel) = loglikelihood(m.model)
+dof(m::UnitfulModel) = dof(m.model)

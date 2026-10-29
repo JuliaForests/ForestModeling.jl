@@ -16,8 +16,9 @@ in the fit, an error smaller than that of a new plot. A mixed model predicts the
 with the population curve, as it would a new plot without calibration.
 
 # Example
+With `heights`, the table of the tutorial, each of its four plots predicted by the other three:
 ```julia
-blockcv(t -> fitglm(@formula(v ~ log(d) + log(h)), t), data, :v, :plot)
+blockcv(t -> fitnls(curtis, t, :h, :d, [3.5, -10.0]), heights, :h, :plot; k=4)
 ```
 """
 function blockcv(fit, data, y::Symbol, block::Symbol; k::Integer=5, rng=Random.default_rng())
@@ -59,4 +60,79 @@ function metrics(y, ŷ)
   e = y .- ŷ
   n = length(e)
   (rmse=sqrt(sum(abs2, e) / n), bias=sum(e) / n, mape=100 * sum(NoUnits.(abs.(e ./ y))) / n)
+end
+
+"""
+    graybilltest(y, ŷ)
+
+F test of Graybill (1976) that the predictions `ŷ` equal the observed `y`: the regression of the
+predicted on the observed values,
+
+```math
+\\hat y_i = \\beta_0 + \\beta_1 y_i + \\varepsilon_i, \\qquad H_0: (\\beta_0, \\beta_1) = (0, 1)
+```
+
+```math
+F = \\frac{(\\hat{\\boldsymbol\\beta} - \\boldsymbol\\theta)^{\\top} \\mathbf{X}^{\\top}\\mathbf{X}
+(\\hat{\\boldsymbol\\beta} - \\boldsymbol\\theta)}{2 s^2} \\sim F_{2,\\, n-2},
+\\qquad \\boldsymbol\\theta = (0, 1)
+```
+
+with ``\\mathbf X = [\\mathbf 1 \\; \\mathbf y]`` and ``s^2`` the residual variance of the regression,
+as in Leite & Oliveira (2002). A small `pvalue` rejects that the predictions equal the observed
+values: a model biased or with a slope other than 1. Returns `β0` (in the unit of `y`), `β1`, `F`
+and `pvalue`.
+
+# Example
+With `volume`, the table of the tutorial:
+```julia
+graybilltest(volume.v, predict(fitglm(@formula(v ~ log(d) + log(h)), volume), volume))
+```
+"""
+function graybilltest(y, ŷ)
+  checklengths(:y => y, :ŷ => ŷ)
+  u = unit(first(y))
+  Y, Ŷ = ustrip.(u, y), ustrip.(u, ŷ)
+  n = length(Y)
+  X = [ones(n) Y]
+  β = X \ Ŷ
+  s² = sum(abs2, Ŷ - X * β) / (n - 2)
+  δ = β - [0, 1]
+  F = δ' * (X' * X) * δ / (2s²)
+  (β0=β[1] * u, β1=β[2], F=F, pvalue=ccdf(FDist(2, n - 2), F))
+end
+
+"""
+    identitytest(fit, data, group)
+
+Test of the identity of models (Regazzi, 1993, 2003): whether the levels of the column(s) `group`
+(clones, stands, species) can share one equation. `fit` takes a `DataFrame` and returns a model of
+the package; the complete model fits each group apart ([`fitbygroup`](@ref)) and the reduced one
+fits all the data together, compared by the likelihood ratio,
+
+```math
+\\lambda = 2\\left(\\sum_{g=1}^{G} \\ell_g - \\ell_{r}\\right) \\sim \\chi^2_{\\nu}, \\qquad
+\\nu = \\sum_{g=1}^{G} p_g - p_r
+```
+
+with ``p`` the number of parameters of each model, those of the variance included. A small
+`pvalue` rejects one equation for all the groups. The complete model also gives each group its
+own variance, so the test compares the whole models, the curve and its spread. Returns `lr`
+(``\\lambda``), `df` (``\\nu``) and `pvalue`.
+
+A categorical column in the formula of [`fitglm`](@ref) tests a part of the equation instead: with
+`@formula(h ~ inv(d) + clone)` each clone has its intercept and the same slope.
+
+# Example
+With `heights`, the table of the tutorial, whether the four plots share one Curtis curve:
+```julia
+identitytest(t -> fitnls(curtis, t, :h, :d, [3.5, -10.0]), heights, :plot)
+```
+"""
+function identitytest(fit, data, group)
+  reduced = fit(data)
+  complete = fitbygroup(fit, data, group).model
+  λ = 2 * (sum(loglikelihood, complete) - loglikelihood(reduced))
+  ν = sum(dof, complete) - dof(reduced)
+  (lr=λ, df=ν, pvalue=ccdf(Chisq(ν), λ))
 end

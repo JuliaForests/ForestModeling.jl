@@ -83,6 +83,22 @@ The **cross-validation by block** keeps the trees of a plot together: the trees 
 alike than those of different plots, so a random split predicts each tree with its own plot in the
 fit and underestimates the error of a new plot.
 
+## Taper and assortments
+
+A stem taper equation, the diameter ``d`` at the height ``h`` of a tree of ``D`` and ``H``, is a
+nonlinear regression fitted by [`fitnls`](@ref) on the stem profiles of felled trees. Eight
+published equations are functions of the package, from the quadratic of Kozak (1969) to the
+variable-exponent ones of Kozak (2004) and Bi (2000). The fitted taper gives, for any tree:
+
+| Result | Function | Method |
+|:-------|:---------|:-------|
+| the diameter at a height | [`taperdiameter`](@ref) | the equation |
+| the height of a diameter | [`taperheight`](@ref) | bisection (Roots.jl) |
+| the volume of a section of the stem | [`taperedvolume`](@ref) | ``\int \frac{\pi}{4} \hat d(h)^2 \, dh`` (QuadGK.jl) |
+| the logs and the volume of each product | [`logassortment`](@ref) | greedy cut by priority |
+
+See [Taper and Assortments](@ref).
+
 ## Units of measurement
 
 The columns may be `Unitful` quantities, in any units: the fit uses the values in the unit of each
@@ -94,6 +110,6 @@ ForestFoundations, so `u"cm"`, `ustrip` and the other units are available after
 ## Not included
 
 Methods that would be a package of their own are left out: generalized additive models (GAM), the
-simultaneous fit of systems of equations (additive biomass components, taper compatible with
-volume), model averaging and Bayesian models (`Turing.jl` can be used directly). The nonlinear
+simultaneous fit of systems of equations (additive biomass components, a taper fitted together
+with a volume equation), the optimization of the value of the logs of a stem, model averaging and Bayesian models (`Turing.jl` can be used directly). The nonlinear
 mixed models and the generalized linear mixed models are still under development.

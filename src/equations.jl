@@ -120,3 +120,37 @@ julia> power(20.0, [0.1, 2.4])
 ```
 """
 power(x, θ) = θ[1] * x^θ[2]
+
+"""
+    honer(d, h, θ)
+
+Honer (1965) volume equation, `θ = (β₀, β₁)`:
+
+```math
+v = \\frac{d^2}{\\beta_0 + \\beta_1 / h}
+```
+
+# Example
+```jldoctest
+julia> honer(20.0, 18.0, [400.0, 20000.0])
+0.2647058823529412
+```
+"""
+honer(d, h, θ) = d^2 / (θ[1] + θ[2] / h)
+
+"""
+    takata(d, h, θ)
+
+Takata (1958) volume equation, `θ = (β₀, β₁)`:
+
+```math
+v = \\frac{d^2 h}{\\beta_0 + \\beta_1 d}
+```
+
+# Example
+```jldoctest
+julia> takata(20.0, 18.0, [20000.0, 400.0])
+0.2571428571428571
+```
+"""
+takata(d, h, θ) = d^2 * h / (θ[1] + θ[2] * d)

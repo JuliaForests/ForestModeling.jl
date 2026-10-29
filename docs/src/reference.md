@@ -17,6 +17,8 @@ prodan
 curtis
 schumacherhall
 spurr
+honer
+takata
 power
 ```
 
@@ -43,5 +45,29 @@ calibrate
 ```@docs
 blockcv
 metrics
+graybilltest
+identitytest
 robustvcov
+```
+
+## Taper equations
+
+```@docs
+kozak1969
+schoepfer1966
+ormerod1973
+demaerschalk1972
+maxburkhart1976
+kozak1988
+kozak2004
+bi2000
+```
+
+## Taper application and assortments
+
+```@docs
+taperdiameter
+taperheight
+taperedvolume
+logassortment
 ```

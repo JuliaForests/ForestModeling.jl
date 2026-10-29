@@ -13,9 +13,10 @@ and the result is a `DataFrame` with a row per group: its level(s) and its model
 or groups that were not sampled, a mixed model ([`fitmixed`](@ref)) is the alternative.
 
 # Example
+With `heights`, the table of the tutorial, a Curtis curve for each plot:
 ```julia
-models = fitbygroup(t -> fitglm(@formula(v ~ log(d) + log(h)), t), data, :clone)
-predict(only(models[models.clone .== "A", :model]), newdata)
+models = fitbygroup(t -> fitnls(curtis, t, :h, :d, [3.5, -10.0]), heights, :plot)
+predict(only(models[models.plot .== "A", :model]), newdata)
 ```
 """
 function fitbygroup(fit, data, group)

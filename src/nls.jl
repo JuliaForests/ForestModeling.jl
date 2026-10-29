@@ -21,14 +21,15 @@ struct NLSFit{F}
 end
 
 # The terms of the negative log-likelihood of each observation, with the parameters
-# p = (θ..., log σ, k) and the standard deviation of the error σ|μ|^k
+# p = (θ..., log σ) and the standard deviation of the error σ, or p = (θ..., log σ, k) and σ|μ|^k;
+# the constant variance never takes the logarithm of μ, which may be 0 (the tip of a stem)
 function _nllterms(f, p, q, x, y)
   θ = p[1:q]
   logσ = p[q+1]
-  k = length(p) > q + 1 ? p[q+2] : zero(eltype(p))
+  power = length(p) > q + 1
   map(x, y) do xi, yi
     μ = f(xi..., θ)
-    logs = logσ + k * log(abs(μ))
+    logs = power ? logσ + p[q+2] * log(abs(μ)) : logσ
     logs + (yi - μ)^2 / (2 * exp(2logs)) + log(2π) / 2
   end
 end
@@ -63,10 +64,12 @@ columns may be `Unitful` quantities: `f` receives their values in the unit of ea
 `href` is given in the unit of the response.
 
 # Example
+With `heights` and `volume`, the tables of the tutorial:
 ```julia
-cr(d, θ) = chapmanrichards(d, θ; href=1.3)   # heights in m
-model = fitnls(cr, data, :h, :d, [25.0, 0.05, 1.0])
-model = fitnls(schumacherhall, data, :v, (:d, :h), [5e-5, 2.0, 1.0])
+fitnls(curtis, heights, :h, :d, [3.5, -10.0])                     # h = curtis(d; θ = [4.266, -34.76])
+fitnls(schumacherhall, volume, :v, (:d, :h), [1e-4, 2.0, 1.0])    # v = schumacherhall(d, h; θ = [6.008e-6, 1.982, 1.57])
+cr(d, θ) = chapmanrichards(d, θ; href=1.3)                        # a curve with an asymptote, heights in m,
+fitnls(cr, data, :h, :d, [25.0, 0.05, 1.0])                       # for diameters where the height levels off
 ```
 """
 function fitnls(f, data, y::Symbol, x, θ0; variance::Symbol=:power)
@@ -98,11 +101,5 @@ vcov(m::NLSFit) = m.vcov
 stderror(m::NLSFit) = sqrt.(diag(m.vcov))
 nobs(m::NLSFit) = length(m.y)
 residuals(m::NLSFit) = (m.y .- [m.f(xi..., m.θ) for xi in m.x]) .* m.units[m.response]
-
-function Base.show(io::IO, m::NLSFit)
-  println(io, "Nonlinear regression of ", m.response, " on ", join(m.predictors, ", "), " (n = ", nobs(m), ")")
-  for (i, (θ, s)) in enumerate(zip(m.θ, stderror(m)))
-    println(io, "  θ[", i, "] = ", θ, "  (standard error ", s, ")")
-  end
-  print(io, "  σ = ", m.σ, ", k = ", m.k, ", log-likelihood = ", m.loglik)
-end
+loglikelihood(m::NLSFit) = m.loglik
+dof(m::NLSFit) = length(m.p)

@@ -14,10 +14,17 @@ method and only the few steps they lack:
 
 and, for every model, [`predict`](@ref) (with intervals), [`calibrate`](@ref) (random effects of a
 new plot from a few measured trees), [`blockcv`](@ref) and [`metrics`](@ref) (cross-validation by
-plot, RMSE, bias, MAPE) and [`robustvcov`](@ref) (sandwich covariance). The classic equations
-([`chapmanrichards`](@ref), [`weibull`](@ref), [`prodan`](@ref), [`curtis`](@ref),
-[`schumacherhall`](@ref), [`spurr`](@ref), [`power`](@ref)) are plain functions used by the
-nonlinear fits.
+plot, RMSE, bias, MAPE), [`graybilltest`](@ref) (predicted against observed), [`identitytest`](@ref)
+(one equation for several groups) and [`robustvcov`](@ref) (sandwich covariance). The classic
+equations ([`chapmanrichards`](@ref), [`weibull`](@ref), [`prodan`](@ref), [`curtis`](@ref),
+[`schumacherhall`](@ref), [`spurr`](@ref), [`honer`](@ref), [`takata`](@ref), [`power`](@ref)) are
+plain functions used by the nonlinear fits.
+
+The stem taper equations ([`kozak1969`](@ref), [`schoepfer1966`](@ref), [`ormerod1973`](@ref),
+[`demaerschalk1972`](@ref), [`maxburkhart1976`](@ref), [`kozak1988`](@ref), [`kozak2004`](@ref),
+[`bi2000`](@ref)), fitted by [`fitnls`](@ref), give the diameter along the stem
+([`taperdiameter`](@ref)), the height of a diameter ([`taperheight`](@ref)), the volume of a section
+([`taperedvolume`](@ref)) and the logs of each product ([`logassortment`](@ref)).
 
 No model transforms the response: the link function (GLM) or the variance function (nonlinear)
 takes the place of the logarithm, so the predictions need no back-transformation and no correction
@@ -28,10 +35,12 @@ module ForestModeling
 using DataFrames, Distributions, ForwardDiff, GLM, LinearAlgebra, MixedModels, Optim, Random,
       Reexport, Statistics, StatsModels
 using LsqFit: AutoForwardDiff, curve_fit
+using QuadGK: quadgk
+using Roots: Bisection, find_zero
 using CovarianceMatrices: CovarianceMatrices
 @reexport using ForestFoundations
 
-import StatsAPI: coef, fitted, nobs, predict, residuals, response, stderror, vcov
+import StatsAPI: coef, dof, fitted, loglikelihood, nobs, predict, residuals, response, stderror, vcov
 
 include("units.jl")
 include("equations.jl")
@@ -43,10 +52,15 @@ include("grouped.jl")
 include("predict.jl")
 include("validation.jl")
 include("robust.jl")
+include("show.jl")
+include("assortment/taper.jl")
+include("assortment/assortment.jl")
 
-export chapmanrichards, weibull, prodan, curtis, schumacherhall, spurr, power,
+export chapmanrichards, weibull, prodan, curtis, schumacherhall, spurr, power, honer, takata,
+       kozak1969, schoepfer1966, ormerod1973, demaerschalk1972, maxburkhart1976, kozak1988, kozak2004, bi2000,
+       taperdiameter, taperheight, taperedvolume, logassortment,
        fitglm, fitnls, fitmixed, fitbygroup, UnitfulModel, NLSFit,
-       predict, calibrate, blockcv, metrics, robustvcov,
+       predict, calibrate, blockcv, metrics, graybilltest, identitytest, robustvcov,
        coef, vcov, stderror, nobs, residuals,
        @formula, Gamma, Normal, Poisson, IdentityLink, LogLink, InverseLink
 

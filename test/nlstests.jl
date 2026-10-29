@@ -1,45 +1,57 @@
 @testset "fitnls" begin
-  # the height curve: the asymptote 25 (the plots move it), b = 0.07, c = 1.1
-  model = fitnls(cr, data, :h, :d, [20.0, 0.05, 1.0])
-  @test model isa NLSFit
-  @test coef(model) ≈ [25.0, 0.07, 1.1] rtol = 0.08
-  @test nobs(model) == nrow(data)
-  @test length(stderror(model)) == 3
-
-  # the volume: Schumacher–Hall with a multiplicative error, so the standard deviation grows with
-  # the mean, k ≈ 1, and σ ≈ 0.08
-  volume = fitnls(schumacherhall, data, :v, (:d, :h), [1e-4, 2.0, 1.0])
-  @test coef(volume)[2:3] ≈ [1.9, 1.0] atol = 0.06
-  @test volume.k ≈ 1.0 atol = 0.1
-  @test volume.σ ≈ 0.08 atol = 0.01
-
-  # the constant variance is the ordinary least squares
-  ols = fitnls(cr, data, :h, :d, [20.0, 0.05, 1.0]; variance=:constant)
+  # Curtis on the heights with the constant variance: the least squares of LsqFit.jl
+  ols = fitnls(curtis, heights, :h, :d, [3.5, -10.0]; variance=:constant)
+  x, y = ustrip.(heights.d), ustrip.(heights.h)
+  reference = curve_fit((x, θ) -> curtis.(x, Ref(θ)), x, y, [3.5, -10.0])
+  @test coef(ols) ≈ reference.param rtol = 1e-6
   @test ols.k == 0
-  x, y = ustrip.(data.d), ustrip.(data.h)
-  sse(θ) = sum(abs2, y .- cr.(x, Ref(θ)))
+  @test ols.σ ≈ sqrt(mean(abs2, reference.resid))
+  @test nobs(ols) == nrow(heights)
+  @test_throws ArgumentError fitnls(curtis, heights, :h, :d, [3.5, -10.0]; variance=:exponential)
+
+  # with the variance function, the likelihood can only grow, and the least squares can only be
+  # smaller with the constant variance
+  model = fitnls(curtis, heights, :h, :d, [3.5, -10.0])
+  @test model.loglik >= ols.loglik
+  sse(θ) = sum(abs2, y .- curtis.(x, Ref(θ)))
   @test sse(coef(ols)) <= sse(coef(model))
-  @test ols.σ ≈ sqrt(sse(coef(ols)) / length(y))
-  @test_throws ArgumentError fitnls(cr, data, :h, :d, [20.0, 0.05, 1.0]; variance=:exponential)
+
+  # Schumacher–Hall of two predictors: the standard deviation grows with the volume, k close to 1
+  # (a multiplicative error), and the exponents agree with the GLM of the Gamma family
+  sh = fitnls(schumacherhall, volume, :v, (:d, :h), [1e-4, 2.0, 1.0])
+  @test 0.5 < sh.k < 1.5
+  shglm = fitglm(@formula(v ~ log(d) + log(h)), volume)
+  @test coef(sh)[2:3] ≈ coef(shglm)[2:3] rtol = 0.02
+
+  # the biomass of a power of the diameter
+  b = fitnls(power, biomass, :b, :d, [0.1, 2.4])
+  @test unit(eltype(predict(b, biomass))) == u"kg"
 
   # the predictions in the unit of the response, and the residuals
-  ŷ = predict(model, data)
+  ŷ = predict(model, heights)
   @test unit(eltype(ŷ)) == u"m"
-  @test ŷ ≈ [cr(ustrip(d), coef(model)) for d in data.d] .* u"m"
-  @test residuals(model) ≈ data.h .- ŷ
+  @test ŷ ≈ curtis.(x, Ref(coef(model))) .* u"m"
+  @test residuals(model) ≈ heights.h .- ŷ
 
   # the intervals: the one of a new tree is wider than the one of the mean
-  conf = predict(model, data[1:5, :]; interval=:confidence)
-  pred = predict(model, data[1:5, :]; interval=:prediction)
+  conf = predict(model, heights[1:5, :]; interval=:confidence)
+  pred = predict(model, heights[1:5, :]; interval=:prediction)
   @test conf.prediction ≈ ŷ[1:5]
   @test all(pred.lower .< conf.lower .< conf.prediction .< conf.upper .< pred.upper)
-  @test_throws ArgumentError predict(model, data; interval=:credible)
+  @test_throws ArgumentError predict(model, heights; interval=:credible)
 
   # about 95% of the trees inside the prediction interval
-  all95 = predict(model, data; interval=:prediction)
-  @test 0.9 < mean(all95.lower .<= data.h .<= all95.upper) < 0.99
+  for (m, data, column) in ((model, heights, :h), (sh, volume, :v))
+    p = predict(m, data; interval=:prediction)
+    @test 0.9 < mean(p.lower .<= data[!, column] .<= p.upper) <= 1
+  end
+
+  # shown with the name of the equation and its parameters
+  @test repr(sh) == "v = schumacherhall(d, h; θ = $(round.(coef(sh); sigdigits=4)))"
+  @test startswith(repr(fitnls((d, θ) -> curtis(d, θ), heights, :h, :d, [3.5, -10.0])), "h = f(d; θ = ")
+  @test occursin("Nonlinear regression of v (m^3) on d, h (n = 91)", repr(MIME("text/plain"), sh))
 
   # the sandwich covariance agrees in size with the one of the model
-  @test size(robustvcov(model)) == (3, 3)
-  @test all(0.3 .< sqrt.(diag(robustvcov(volume))) ./ stderror(volume) .< 3)
+  @test size(robustvcov(model)) == (2, 2)
+  @test all(0.3 .< sqrt.(diag(robustvcov(sh))) ./ stderror(sh) .< 3)
 end
